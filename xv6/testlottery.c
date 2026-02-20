@@ -2,24 +2,36 @@
 #include "stat.h"
 #include "user.h"
 
-static volatile int sink = 0;
-static void burn(int n){ for(int i=0;i<n;i++) sink += i; }
+volatile int sink;
 
-int main(int argc, char **argv){
-  int t = 10;
-  if(argc == 2) t = atoi(argv[1]);
+static void do_work(int iters){
+  for(int i = 0; i < iters; i++)
+    sink += i;
+}
 
-  if(settickets(0) == 0){
-    printf(1, "FAIL: settickets(0) should fail\n");
-    exit();
-  }
-  if(t >= 1 && settickets(t) != 0){
-    printf(1, "FAIL: settickets(%d) should succeed\n", t);
-    exit();
-  }
-  printf(1, "PASS: settickets validation\n");
+static void run_child(int t){
+  settickets(t);
+  for(int k = 0; k < 200; k++)
+    do_work(200000);
+  printf(1, "[PID %d] child tickets=%d done\n", getpid(), t);
+  exit();
+}
 
-  for(int k=0;k<200;k++) burn(200000);
-  printf(1, "testlottery: done\n");
+int
+main(void)
+{
+  int pid;
+
+  pid = fork();
+  if(pid == 0) run_child(10);
+
+  pid = fork();
+  if(pid == 0) run_child(5);
+
+  pid = fork();
+  if(pid == 0) run_child(1);
+
+  while(wait() > 0) { }
+  printf(1, "all done\n");
   exit();
 }

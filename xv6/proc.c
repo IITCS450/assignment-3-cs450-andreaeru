@@ -334,7 +334,7 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-  
+   
   for(;;){
     // Enable interrupts on this processor.
     sti();
@@ -357,6 +357,7 @@ scheduler(void)
     int winner = lcg_random() % total_tickets;
 
     int counter = 0;
+    struct proc *chosen = 0;
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if (p->state != RUNNABLE || p->tickets <= 0)
@@ -364,22 +365,29 @@ scheduler(void)
 
       counter += p->tickets;
       if(counter > winner){ 
-        c->proc = p;
-        switchuvm(p);
-        p->state = RUNNING;
-
-        swtch(&(c->scheduler), p->context);
-        switchkvm();
-
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-      break;
+        chosen = p;
+        break;
       }
-    }
-    release(&ptable.lock);
+    } 
 
+    if (chosen ==0){
+      release(&ptable.lock);
+      continue;
+    }
+      
+
+    // 4) Run the chosen process
+    c->proc = chosen;
+    switchuvm(chosen);
+    chosen->state = RUNNING;
+
+    swtch(&(c->scheduler), chosen->context);
+    switchkvm();
+
+    // Process is done running for now.
+    c->proc = 0;
+
+    release(&ptable.lock);
   }
 }
 
